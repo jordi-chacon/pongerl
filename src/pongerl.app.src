@@ -1,0 +1,19 @@
+{application, pongerl, 
+ [
+  {description,  "pongerl - An x-term-based version of the arcade video game Pong."},
+
+  % The Module and Args used to start this application.
+  {mod, { pongerl_app, []} },
+
+  % All modules used by the application.
+  {modules,
+   [pongerl_app
+    ,pongerl_sup
+   ]},
+
+  % configuration parameters similar to those in the config file specified on the command line
+  {env, [{ip, "0.0.0.0"}
+         ,{hostname, "localhost"}
+         ,{port, 8282}	
+        ]}
+ ]}.
