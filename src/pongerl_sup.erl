@@ -48,6 +48,6 @@ upgrade() ->
 init([]) ->
     PongerlServer = worker(pongerl_server),
     PongerlEngine = worker(pongerl_engine),
-    {ok, {{one_for_one, 10, 10}, [PongerlEngine]}}.
+    {ok, {{one_for_one, 10, 10}, [PongerlServer, PongerlEngine]}}.
 
 

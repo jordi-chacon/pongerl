@@ -64,13 +64,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 do_connect_client(State) ->
     ID = State#state.last_id,
-    Clients = [Id|State#state.clients],
+    Clients = [ID | State#state.clients],
     case Clients of
-	[ID1, ID2] -> ok = pongerl_engine:start_game(ID1, ID2),
+	[ID1, ID2] -> ok = pongerl_engine:start_game(ID1, ID2);
 	_          -> ok
     end,
-    NewState = State#state{last_id = ID+ 1, clients = Clients},
-    {reply, Id, NewState}.
+    NewState = State#state{last_id = ID + 1, clients = Clients},
+    {reply, ID, NewState}.
     
 do_get_state(State) ->
     Reply = pongerl_engine:get_state(),
