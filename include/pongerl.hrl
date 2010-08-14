@@ -8,6 +8,14 @@
 -define(XF, 80).
 -define(YF, 20).
 
+% Dimensions of the bars of the clients
+-define(CY, 3).
+-define(CX, 1).
+
+% Dimensions of the ball
+-define(BX, 2).
+-define(BY, 1).
+
 -record(ball, {x = (?XF - ?X0) div 2,
 	       y = (?YF - ?Y0) div 2,
 	       speed = 1,
