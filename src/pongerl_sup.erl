@@ -47,6 +47,7 @@ upgrade() ->
 %% @doc supervisor callback.
 init([]) ->
     PongerlServer = worker(pongerl_server),
-    {ok, {{one_for_one, 10, 10}, [PongerlServer]}}.
+    PongerlEngine = worker(pongerl_engine),
+    {ok, {{one_for_one, 10, 10}, [PongerlEngine]}}.
 
 

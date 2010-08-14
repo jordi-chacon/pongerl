@@ -14,6 +14,8 @@
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-include_lib("../include/pongerl.hrl").
+
 -define(SERVER, ?MODULE). 
 
 -record(state, {clients = [], last_id = 0}).
@@ -26,17 +28,17 @@ init([]) ->
     {ok, #state{}}.
 
 connect_client() ->
-    gen_server:call(?MODULE, {connect_client}).
+    gen_server:call(?MODULE, connect_client).
 
 get_state() ->
-    gen_server:call(?MODULE, {get_state}).
+    gen_server:call(?MODULE, get_state).
 
 change_client_position(ClientID, Direction) ->
     gen_server:call(?MODULE, {change_client_position, ClientID, Direction}).
 
-handle_call({connect_client}, _From, State) ->
+handle_call(connect_client, _From, State) ->
     do_connect_client(State);
-handle_call({get_state}, _From, State) ->
+handle_call(get_state, _From, State) ->
     do_get_state(State);
 handle_call({change_client_position, ClientID, Direction}, _From, State) ->
     do_change_client_position(ClientID, Direction, State);
@@ -64,9 +66,9 @@ do_connect_client(State) ->
     ID = State#state.last_id,
     Clients = [Id|State#state.clients],
     case Clients of
-	[ID1, ID2] -> pongerl_engine:start(ID1, ID2),
+	[ID1, ID2] -> ok = pongerl_engine:start_game(ID1, ID2),
 	_          -> ok
-    end.
+    end,
     NewState = State#state{last_id = ID+ 1, clients = Clients},
     {reply, Id, NewState}.
     
@@ -75,5 +77,5 @@ do_get_state(State) ->
     {reply, Reply, State}.
 
 do_change_client_position(ClientID, Direction, State) ->
-    game_engine:change_client_position(ClientID, Direction),
+    ok = game_engine:change_client_position(ClientID, Direction),
     {reply, ok, State}.
