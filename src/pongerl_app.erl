@@ -11,7 +11,7 @@
 -include("pongerl.hrl").
 
 start(_, _) ->
-    polish_sup:start_link().
+    pongerl_sup:start_link().
 
 stop(_) ->
     ok.
