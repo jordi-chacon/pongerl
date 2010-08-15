@@ -20,7 +20,7 @@
 
 -define(SERVER, ?MODULE). 
 
--record(state, {clients = [], ball = #ball{}, path = []}).
+-record(state, {clients = [], ball = #ball{}}).
 
 
 start_link() ->
@@ -89,9 +89,11 @@ do_restart_game(State) ->
     {noreply, NewState}.
 
 do_get_state(State) ->
-    CPos = State#state.clients,
-    BallPos = get_ball_position(State#state.ball),
-    {reply, {CPos, BallPos}, State}.
+    case State#state.clients of
+	[{_, P1}, {_, P2}] -> Reply = {P1, P2, get_ball_position(State#state.ball)};
+	_                  -> Reply = not_started
+    end,
+    {reply, Reply, State}.
 
 do_change_client_position(ClientID, Direction, State) ->
     CPos = get_client_new_position(ClientID, State#state.clients, Direction),
@@ -101,10 +103,10 @@ do_change_client_position(ClientID, Direction, State) ->
 
 do_run_engine(#state{clients = [{_ID1, P1}, {_ID2, P2}], ball = Ball} =State) ->
     case run_steps(P1, P2, Ball) of
-	{Path, NewBall} -> ok;
-	{Path, NewBall, end_of_game} -> run_engine_caller ! die
+	{NewBall, end_of_game} -> run_engine_caller ! die;
+	NewBall -> ok
     end,
-    {reply, ok, State#state{ball = NewBall, path = Path}}.
+    {reply, ok, State#state{ball = NewBall}}.
     
 
 %%%===================================================================
@@ -128,11 +130,11 @@ run_steps(P1, P2, Ball) ->
 
 % steps done
 run_step(_P1, _P2, Ball, Path, 0) ->
-    {Path, Ball};
+    Ball#ball{path = Path};
 % end of game
 run_step({X1, _Y1}, {X2, _Y2}, #ball{x = BX} = Ball, Path, _Steps) 
   when X1 =:= BX orelse X2 =:= BX ->
-    {Path, Ball, end_of_game};    
+    {Ball#ball{path = Path}, end_of_game};    
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB =:= X1 + 1->
     Degrees = Ball#ball.degrees,
@@ -184,7 +186,7 @@ run_engine_caller() ->
 	die ->
 	    timer:sleep(2000),
 	    restart_game()
-    after 100 ->
+    after ?ROUND_LENGTH ->
 	    ok = run_engine(),
 	    run_engine_caller()
     end.

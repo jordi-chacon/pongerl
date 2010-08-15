@@ -16,7 +16,11 @@
 -define(BX, 2).
 -define(BY, 1).
 
+% Round length
+-define(ROUND_LENGTH, 100).
+
 -record(ball, {x = (?XF - ?X0) div 2,
 	       y = (?YF - ?Y0) div 2,
 	       speed = 1,
-	       degrees = 180}).
+	       degrees = 180,
+	       path = []}).
