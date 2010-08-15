@@ -8,7 +8,7 @@
 %% API
 -export([connect_client/0,
 	 change_client_position/2,
-	 get_state/0]).
+	 get_state/1]).
 
 %% gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -30,16 +30,16 @@ init([]) ->
 connect_client() ->
     gen_server:call(?MODULE, connect_client).
 
-get_state() ->
-    gen_server:call(?MODULE, get_state).
+get_state(ID) ->
+    gen_server:call(?MODULE, {get_state, ID}).
 
 change_client_position(ClientID, Direction) ->
     gen_server:call(?MODULE, {change_client_position, ClientID, Direction}).
 
 handle_call(connect_client, _From, State) ->
     do_connect_client(State);
-handle_call(get_state, _From, State) ->
-    do_get_state(State);
+handle_call({get_state, ID}, _From, State) ->
+    do_get_state(ID, State);
 handle_call({change_client_position, ClientID, Direction}, _From, State) ->
     do_change_client_position(ClientID, Direction, State);
 handle_call(_Request, _From, State) ->
@@ -72,10 +72,11 @@ do_connect_client(State) ->
     NewState = State#state{last_id = ID + 1, clients = Clients},
     {reply, ID, NewState}.
     
-do_get_state(State) ->
-    Reply = pongerl_engine:get_state(),
+do_get_state(ID, State) ->
+    Reply = pongerl_engine:get_state(ID),
+    io:format("~p~n", [Reply]),
     {reply, Reply, State}.
 
 do_change_client_position(ClientID, Direction, State) ->
-    ok = game_engine:change_client_position(ClientID, Direction),
+    ok = pongerl_engine:change_client_position(ClientID, Direction),
     {reply, ok, State}.

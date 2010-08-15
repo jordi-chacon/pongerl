@@ -8,7 +8,7 @@
 %% API
 -export([start_game/2,
 	 restart_game/0,
-	 get_state/0,
+	 get_state/1,
 	 change_client_position/2,
 	 run_engine/0]).
 
@@ -35,8 +35,8 @@ start_game(ID1, ID2) ->
 restart_game() ->
     gen_server:cast(?MODULE, restart_game).
 
-get_state() ->
-    gen_server:call(?MODULE, get_state).
+get_state(ID) ->
+    gen_server:call(?MODULE, {get_state, ID}).
 
 change_client_position(ClientID, Direction) ->
     gen_server:call(?MODULE, {change_client_position, ClientID, Direction}).
@@ -46,8 +46,8 @@ run_engine() ->
 
 handle_call({start_game, ID1, ID2}, _From, State) ->
     do_start_game(ID1, ID2, State);
-handle_call(get_state, _From, State) ->
-    do_get_state(State);
+handle_call({get_state, ID}, _From, State) ->
+    do_get_state(ID, State);
 handle_call({change_client_position, ClientID, Direction}, _From, State) ->
     do_change_client_position(ClientID, Direction, State);
 handle_call(run_engine, _From, State) ->
@@ -75,58 +75,83 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 do_start_game(ID1, ID2, _State) ->
-    C1 = get_initial_position_client(first),
-    C2 = get_initial_position_client(second),
+    C1 = get_initial_position_client(ID1, first),
+    C2 = get_initial_position_client(ID2, second),
     Ball = get_initial_position_ball(),
-    NewState = #state{clients = [{ID1, C1}, {ID2, C2}], ball = Ball},
-    register(run_engine_caller, run_engine_caller()),
+    NewState = #state{clients = [C1, C2], ball = Ball},
+    spawn(fun() -> run_engine_caller() end),
     {reply, ok, NewState}.
 
 do_restart_game(State) ->
     Ball = get_initial_position_ball(),
     NewState = State#state{ball = Ball},
-    register(run_engine_caller, run_engine_caller()),
+    spawn(fun() -> run_engine_caller() end),
     {noreply, NewState}.
 
-do_get_state(State) ->
-    case State#state.clients of
-	[{_, P1}, {_, P2}] -> Reply = {P1, P2, get_ball_position(State#state.ball)};
-	_                  -> Reply = not_started
-    end,
-    {reply, Reply, State}.
+do_get_state(ID, State) ->
+    {Reply, NewState} = case State#state.clients of
+			    [C1, C2] -> 
+				NC1 = flag_and_clean_client_path(ID, C1),
+				NC2 = flag_and_clean_client_path(ID, C2),
+				NS = State#state{clients = [NC1, NC2]},
+				{{C1, C2, State#state.ball}, NS};
+			    _ -> 
+				{not_started, State}
+			end,
+    {reply, Reply, NewState}.
 
 do_change_client_position(ClientID, Direction, State) ->
-    CPos = get_client_new_position(ClientID, State#state.clients, Direction),
-    PL1 = proplists:delete(ClientID, State#state.clients),
-    NewState = State#state{clients = [{ClientID, CPos} | PL1]},
+    C = get_client_new_position(ClientID, State#state.clients, Direction),
+    L1 = lists:keydelete(ClientID, 2, State#state.clients),
+    NewState = State#state{clients = [C | L1]},
     {reply, ok, NewState}.
 
-do_run_engine(#state{clients = [{_ID1, P1}, {_ID2, P2}], ball = Ball} =State) ->
-    case run_steps(P1, P2, Ball) of
-	{NewBall, end_of_game} -> run_engine_caller ! die;
-	NewBall -> ok
+do_run_engine(#state{clients = [C1, C2], ball = Ball} =State) ->
+    #client{x = X1, y = Y1} = C1,
+    #client{x = X2, y = Y2} = C2,
+    Reply = case run_steps({X1, Y1}, {X2, Y2}, Ball) of
+		{NewBall, end_of_game} -> end_of_game;
+		NewBall                -> ok
     end,
-    {reply, ok, State#state{ball = NewBall}}.
+    {reply, Reply, State#state{ball = NewBall}}.
     
 
 %%%===================================================================
 %%% More internal functions
 %%%===================================================================
 
-get_initial_position_client(first)  -> {?X0 + 2, ?Y0 div 2};
-get_initial_position_client(second) -> {?XF - 2, ?Y0 div 2}.
+get_initial_position_client(ID, first) ->
+    X = ?X0 + 2,
+    Y = ?YF div 2,
+    #client{id = ID, x = X, y = Y, path = [{X, Y}]};
+get_initial_position_client(ID, second) ->
+    X = ?XF - 2 - ?CX,
+    Y = ?YF div 2,
+    #client{id = ID, x = X, y = Y, path = [{X, Y}]}.
 
 get_initial_position_ball() -> #ball{}.
 
-get_ball_position(#ball{x = X, y = Y}) -> {X, Y}.
-
-get_client_new_position(ID, [{ID, {X, Y}} | _T], ?UP)   -> {X, Y - 1};
-get_client_new_position(ID, [{ID, {X, Y}} | _T], ?DOWN) -> {X, Y + 1};
-get_client_new_position(ID, [{_ID, _Pos} | T], Dir) -> 
+get_client_new_position(ID, [#client{id = ID, y = Y, x = X} = C | _T], ?UP) ->
+    C#client{y = Y - 1, path = [{X, Y} | C#client.path]};
+get_client_new_position(ID, [#client{id = ID, y = Y, x = X} = C | _T], ?DOWN) ->
+    C#client{y = Y + 1, path = [{X, Y} | C#client.path]};
+get_client_new_position(ID, [_C | T], Dir) -> 
     get_client_new_position(ID, T, Dir).
 
-run_steps(P1, P2, Ball) ->
-    run_step(P1, P2, Ball, [], Ball#ball.speed).
+flag_and_clean_client_path(ID, C) ->
+    NewPath = flag_and_clean_client_path(ID, C#client.path, []),
+    C#client{path = NewPath}.
+flag_and_clean_client_path(_ID, [], Acc) ->
+    lists:reverse(Acc);
+flag_and_clean_client_path(ID, [{X, Y} | T], Acc) ->
+    flag_and_clean_client_path(ID, T, [{X, Y, ID} | Acc]);
+flag_and_clean_client_path(ID, [{X, Y, ID} | T], Acc) ->
+    flag_and_clean_client_path(ID, T, [{X, Y, ID} | Acc]);
+flag_and_clean_client_path(ID, [{_X, _Y, _ID2} | T], Acc) ->
+    flag_and_clean_client_path(ID, T, Acc).
+
+run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed} = Ball) ->
+    run_step(P1, P2, Ball, [{X, Y}], Speed).
 
 % steps done
 run_step(_P1, _P2, Ball, Path, 0) ->
@@ -136,14 +161,19 @@ run_step({X1, _Y1}, {X2, _Y2}, #ball{x = BX} = Ball, Path, _Steps)
   when X1 =:= BX orelse X2 =:= BX ->
     {Ball#ball{path = Path}, end_of_game};    
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
-  when XB =:= X1 + 1->
+  when XB =:= X1 + 1 ->
     Degrees = Ball#ball.degrees,
     case YB >= Y1 andalso YB =< Y1 + ?CY of
-	true ->
+	true when Degrees > 90 andalso Degrees < 270 ->
 	    % client 1 touches the ball
 	    NewDegrees = get_new_degree(Degrees, opposite),
 	    NewPath = [{XB, YB} | Path],
 	    NewBall = Ball#ball{degrees = NewDegrees};
+	true ->
+	    % client 1 has changed the direction of the ball
+	    {NX, NY} = get_next_ball_position(XB, YB, Degrees),
+	    NewPath = [{NX, NY} | Path],
+	    NewBall = Ball#ball{x = NX, y = NY};
 	false ->
 	    % client 1 receives a goal
 	    {NX, NY} = get_next_ball_position(XB, YB, Degrees),
@@ -152,14 +182,19 @@ run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps)
     end,
     run_step(P1, P2, NewBall, NewPath, Steps - 1);
 run_step(P1, P2 = {X2, Y2}, #ball{x = XB, y = YB} = Ball, Path, Steps) 
-  when XB =:= X2 - 1 ->
+  when XB + ?BX =:= X2 ->
     Degrees = Ball#ball.degrees,
     case YB >= Y2 andalso YB =< Y2 + ?CY of
-	true ->
+	true when Degrees < 90 andalso Degrees > 270 ->
 	    % client 2 touches the ball
 	    NewDegrees = get_new_degree(Degrees, opposite),
 	    NewPath = [{XB, YB} | Path],
 	    NewBall = Ball#ball{degrees = NewDegrees};
+	true ->
+	    % client 2 has changed the direction of the ball
+	    {NX, NY} = get_next_ball_position(XB, YB, Degrees),
+	    NewPath = [{NX, NY} | Path],
+	    NewBall = Ball#ball{x = NX, y = NY};
 	false ->
 	    % client 2 receives a goal
 	    {NX, NY} = get_next_ball_position(XB, YB, Degrees),
@@ -182,12 +217,9 @@ get_next_ball_position(X, Y, 0)   -> {X + 1, Y}.
     
 % loop to run the game engine every xx ms
 run_engine_caller() ->
-    receive
-	die ->
-	    timer:sleep(2000),
-	    restart_game()
-    after ?ROUND_LENGTH ->
-	    ok = run_engine(),
-	    run_engine_caller()
+    timer:sleep(?ROUND_LENGTH),
+    case run_engine() of
+	ok          -> run_engine_caller();
+	end_of_game -> restart_game()
     end.
     
