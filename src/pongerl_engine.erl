@@ -20,7 +20,7 @@
 
 -define(SERVER, ?MODULE). 
 
--record(state, {clients = [], ball = #ball{}}).
+-record(state, {client1 = empty, client2 = empty, ball = #ball{}}).
 
 
 start_link() ->
@@ -78,7 +78,7 @@ do_start_game(ID1, ID2, _State) ->
     C1 = get_initial_position_client(ID1, first),
     C2 = get_initial_position_client(ID2, second),
     Ball = get_initial_position_ball(),
-    NewState = #state{clients = [C1, C2], ball = Ball},
+    NewState = #state{client1 = C1, client2 = C2, ball = Ball},
     spawn(fun() -> run_engine_caller() end),
     {reply, ok, NewState}.
 
@@ -89,24 +89,34 @@ do_restart_game(State) ->
     {noreply, NewState}.
 
 do_get_state(ID, State) ->
-    {Reply, NewState} = case State#state.clients of
-			    [C1, C2] -> 
+    C1 = State#state.client1,
+    C2 = State#state.client2,
+    {Reply, NewState} = case C1 =/= empty andalso C2 =/= empty of
+			    true -> 
 				NC1 = flag_and_clean_client_path(ID, C1),
 				NC2 = flag_and_clean_client_path(ID, C2),
-				NS = State#state{clients = [NC1, NC2]},
+				NS = State#state{client1 = NC1, client2 = NC2},
 				{{C1, C2, State#state.ball}, NS};
-			    _ -> 
+			    false -> 
 				{not_started, State}
 			end,
     {reply, Reply, NewState}.
 
-do_change_client_position(ClientID, Direction, State) ->
-    C = get_client_new_position(ClientID, State#state.clients, Direction),
-    L1 = lists:keydelete(ClientID, 2, State#state.clients),
-    NewState = State#state{clients = [C | L1]},
+do_change_client_position(ClientID, Direction, 
+			  State = #state{client1 = C1, client2 = C2}) ->
+    ID1 = C1#client.id,
+    ID2 = C2#client.id,
+    NewState = case ClientID of
+		   ID1 ->
+		       NC = get_client_new_position(C1, Direction),
+		       State#state{client1 = NC};
+		   ID2 ->
+		       NC = get_client_new_position(C2, Direction),
+		       State#state{client2 = NC}
+	       end,
     {reply, ok, NewState}.
 
-do_run_engine(#state{clients = [C1, C2], ball = Ball} =State) ->
+do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
     #client{x = X1, y = Y1} = C1,
     #client{x = X2, y = Y2} = C2,
     Reply = case run_steps({X1, Y1}, {X2, Y2}, Ball) of
@@ -131,12 +141,10 @@ get_initial_position_client(ID, second) ->
 
 get_initial_position_ball() -> #ball{}.
 
-get_client_new_position(ID, [#client{id = ID, y = Y, x = X} = C | _T], ?UP) ->
+get_client_new_position(#client{y = Y, x = X} = C, ?UP) ->
     C#client{y = Y - 1, path = [{X, Y} | C#client.path]};
-get_client_new_position(ID, [#client{id = ID, y = Y, x = X} = C | _T], ?DOWN) ->
-    C#client{y = Y + 1, path = [{X, Y} | C#client.path]};
-get_client_new_position(ID, [_C | T], Dir) -> 
-    get_client_new_position(ID, T, Dir).
+get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) ->
+    C#client{y = Y + 1, path = [{X, Y} | C#client.path]}.
 
 flag_and_clean_client_path(ID, C) ->
     NewPath = flag_and_clean_client_path(ID, C#client.path, []),
@@ -158,7 +166,7 @@ run_step(_P1, _P2, Ball, Path, 0) ->
     Ball#ball{path = Path};
 % end of game
 run_step({X1, _Y1}, {X2, _Y2}, #ball{x = BX} = Ball, Path, _Steps) 
-  when X1 =:= BX orelse X2 =:= BX ->
+  when X1 =:= BX orelse X2 + ?BX - 1 =:= BX ->
     {Ball#ball{path = Path}, end_of_game};    
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB =:= X1 + 1 ->
@@ -185,7 +193,7 @@ run_step(P1, P2 = {X2, Y2}, #ball{x = XB, y = YB} = Ball, Path, Steps)
   when XB + ?BX =:= X2 ->
     Degrees = Ball#ball.degrees,
     case YB >= Y2 andalso YB =< Y2 + ?CY of
-	true when Degrees < 90 andalso Degrees > 270 ->
+	true when Degrees < 90 orelse Degrees > 270 ->
 	    % client 2 touches the ball
 	    NewDegrees = get_new_degree(Degrees, opposite),
 	    NewPath = [{XB, YB} | Path],
