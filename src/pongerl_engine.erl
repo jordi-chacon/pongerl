@@ -141,10 +141,11 @@ get_initial_position_client(ID, second) ->
 
 get_initial_position_ball() -> #ball{}.
 
-get_client_new_position(#client{y = Y, x = X} = C, ?UP) ->
+get_client_new_position(#client{y = Y, x = X} = C, ?UP) when Y > ?Y0 ->
     C#client{y = Y - 1, path = [{X, Y} | C#client.path]};
-get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) ->
-    C#client{y = Y + 1, path = [{X, Y} | C#client.path]}.
+get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) when Y + ?CY < ?YF ->
+    C#client{y = Y + 1, path = [{X, Y} | C#client.path]};
+get_client_new_position(C, _Direction) -> C.
 
 flag_and_clean_client_path(ID, C) ->
     NewPath = flag_and_clean_client_path(ID, C#client.path, []),
