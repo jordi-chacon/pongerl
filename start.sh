@@ -8,7 +8,7 @@ execute_server() {
 }
 
 execute_client() {
-    erl -pa ./ebin ${CECHO_EBIN} -sname $1 -setcookie pongerl -eval 'pongerl_client:start()' +A 200
+    erl -noinput -pa ./ebin ${CECHO_EBIN} -sname $1 -setcookie pongerl -eval 'pongerl_client:start()' +A 200
 }
 
 
