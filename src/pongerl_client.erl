@@ -52,8 +52,8 @@ draw_game_loop(ID, ClientStr, BallStr) ->
     draw_game_loop(ID, ClientStr, BallStr).
 
 draw_game(ID, C1, C2, Ball, ClientStr, BallStr) ->
-    Path1 = clean_client_path(ID, C1#client.path),
-    Path2 = clean_client_path(ID, C2#client.path),
+    Path1 = clean_client_path(ID, C1),
+    Path2 = clean_client_path(ID, C2),
     draw(Path1, ClientStr, ?CY, ?CLIENT_PAIR, true),
     draw(Path2, ClientStr, ?CY, ?CLIENT_PAIR, true),
     draw(lists:reverse(Ball#ball.path), BallStr, ?BY, ?BALL_PAIR, true).
@@ -86,8 +86,8 @@ draw_field() ->
     Str = generate_spaces(?XF - ?X0),
     draw([{?X0, ?Y0}], Str, ?YF, ?FIELD_PAIR, false).
 
-clean_client_path(ID, Path) ->
-    clean_client_path(ID, Path, []).
+clean_client_path(ID, C) ->
+    clean_client_path(ID, C#client.path, []) ++ [{C#client.x, C#client.y}].
 clean_client_path(ID, [{_X, _Y, ID} | T], Acc) ->
     clean_client_path(ID, T, Acc);
 clean_client_path(ID, [{X, Y, _ID2} | T], Acc) ->
