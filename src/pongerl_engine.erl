@@ -140,11 +140,11 @@ do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
 
 get_initial_position_client(ID, first) ->
     X = ?X0 + 2,
-    Y = ?YF div 2,
+    Y = ?YF div 2 - ?CY div 2,
     #client{id = ID, x = X, y = Y, path = [{X, Y}]};
 get_initial_position_client(ID, second) ->
     X = ?XF - 2 - ?CX,
-    Y = ?YF div 2,
+    Y = ?YF div 2 - ?CY div 2,
     #client{id = ID, x = X, y = Y, path = [{X, Y}]}.
 
 get_initial_position_ball() -> #ball{}.
@@ -177,8 +177,8 @@ run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed, path = Path} = Ball) ->
 run_step(_P1, _P2, Ball, Path, 0) ->
     Ball#ball{path = Path};
 % end of game
-run_step({X1, _Y1}, {X2, _Y2}, #ball{x = BX} = Ball, Path, _Steps) 
-  when X1 =:= BX orelse X2 + ?BX - 1 =:= BX ->
+run_step({X1, _Y1}, {X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps) 
+  when X1 =:= XB orelse XB + ?BX - 1 =:= X2 ->
     {Ball#ball{path = Path}, end_of_game};    
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB =:= X1 + 1 ->
