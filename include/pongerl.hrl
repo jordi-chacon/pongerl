@@ -19,6 +19,9 @@
 % Round length
 -define(ROUND_LENGTH, 100).
 
+% Pause after goal
+-define(PAUSE_AFTER_GOAL, 2000).
+
 % Color pairs
 -define(CLIENT_PAIR, 1).
 -define(BALL_PAIR, 2).

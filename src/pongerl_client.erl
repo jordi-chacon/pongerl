@@ -43,8 +43,11 @@ key_input_loop(ID) ->
 
 draw_game_loop(ID, ClientStr, BallStr) ->
     case rpc(get_state, [ID]) of
-	not_started -> 
+	not_started ->
 	    timer:sleep(?ROUND_LENGTH);
+	restarting ->
+ 	    timer:sleep(?PAUSE_AFTER_GOAL div 4),
+	    draw_field();
 	{C1, C2, Ball} ->
 	    draw_game(ID, C1, C2, Ball, ClientStr, BallStr),
 	    timer:sleep(?ROUND_LENGTH)

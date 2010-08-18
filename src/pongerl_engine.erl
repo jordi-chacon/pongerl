@@ -20,7 +20,8 @@
 
 -define(SERVER, ?MODULE). 
 
--record(state, {client1 = empty, client2 = empty, ball = #ball{}}).
+-record(state, {client1 = empty, client2 = empty, 
+		ball = #ball{}, status = not_started}).
 
 
 start_link() ->
@@ -78,13 +79,16 @@ do_start_game(ID1, ID2, _State) ->
     C1 = get_initial_position_client(ID1, first),
     C2 = get_initial_position_client(ID2, second),
     Ball = get_initial_position_ball(),
-    NewState = #state{client1 = C1, client2 = C2, ball = Ball},
+    NewState = #state{client1 = C1, client2 = C2, ball = Ball, status = started},
     spawn(fun() -> run_engine_caller() end),
     {reply, ok, NewState}.
 
-do_restart_game(State) ->
+do_restart_game(State = #state{client1 = C1, client2 = C2}) ->
+    NC1 = get_initial_position_client(C1#client.id, first),
+    NC2 = get_initial_position_client(C2#client.id, second),
     Ball = get_initial_position_ball(),
-    NewState = State#state{ball = Ball},
+    NewState = State#state{client1 = NC1, client2 = NC2, 
+			   ball = Ball, status = restarting},
     spawn(fun() -> run_engine_caller() end),
     {noreply, NewState}.
 
@@ -92,15 +96,17 @@ do_get_state(ID, State) ->
     C1 = State#state.client1,
     C2 = State#state.client2,
     {Reply, NewState} = 
-	case C1 =/= empty andalso C2 =/= empty of
-	    true -> 
+	case State#state.status of
+	    started -> 
 		NC1 = flag_and_clean_path(ID, C1),
 		NC2 = flag_and_clean_path(ID, C2),
 		NB = flag_and_clean_path(ID, State#state.ball),
 		NS = State#state{client1 = NC1, client2 = NC2, ball = NB},
 		{{C1, C2, State#state.ball}, NS};
-	    false -> 
-		{not_started, State}
+	    not_started -> {not_started, State};
+	    restarting  -> {restarting, State#state{status = {restarting, ID}}};
+	    {restarting, ID} = St -> {restarting, State#state{status = St}};
+	    {restarting, _ID2} -> {restarting, State#state{status = not_started}}
 	end,
     {reply, Reply, NewState}.
 
@@ -125,7 +131,7 @@ do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
 		{NewBall, end_of_game} -> end_of_game;
 		NewBall                -> ok
     end,
-    {reply, Reply, State#state{ball = NewBall}}.
+    {reply, Reply, State#state{ball = NewBall, status = started}}.
     
 
 %%%===================================================================
@@ -234,6 +240,6 @@ run_engine_caller() ->
     timer:sleep(?ROUND_LENGTH),
     case run_engine() of
 	ok          -> run_engine_caller();
-	end_of_game -> restart_game()
+	end_of_game -> timer:sleep(?PAUSE_AFTER_GOAL), restart_game()
     end.
     
