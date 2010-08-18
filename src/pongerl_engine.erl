@@ -91,15 +91,17 @@ do_restart_game(State) ->
 do_get_state(ID, State) ->
     C1 = State#state.client1,
     C2 = State#state.client2,
-    {Reply, NewState} = case C1 =/= empty andalso C2 =/= empty of
-			    true -> 
-				NC1 = flag_and_clean_client_path(ID, C1),
-				NC2 = flag_and_clean_client_path(ID, C2),
-				NS = State#state{client1 = NC1, client2 = NC2},
-				{{C1, C2, State#state.ball}, NS};
-			    false -> 
-				{not_started, State}
-			end,
+    {Reply, NewState} = 
+	case C1 =/= empty andalso C2 =/= empty of
+	    true -> 
+		NC1 = flag_and_clean_path(ID, C1),
+		NC2 = flag_and_clean_path(ID, C2),
+		NB = flag_and_clean_path(ID, State#state.ball),
+		NS = State#state{client1 = NC1, client2 = NC2, ball = NB},
+		{{C1, C2, State#state.ball}, NS};
+	    false -> 
+		{not_started, State}
+	end,
     {reply, Reply, NewState}.
 
 do_change_client_position(ClientID, Direction, 
@@ -147,20 +149,23 @@ get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) when Y + ?CY < ?YF ->
     C#client{y = Y + 1, path = [{X, Y} | C#client.path]};
 get_client_new_position(C, _Direction) -> C.
 
-flag_and_clean_client_path(ID, C) ->
-    NewPath = flag_and_clean_client_path(ID, C#client.path, []),
-    C#client{path = NewPath}.
-flag_and_clean_client_path(_ID, [], Acc) ->
+flag_and_clean_path(ID, #client{} = C) ->
+    NewPath = flag_and_clean_path(ID, C#client.path, []),
+    C#client{path = NewPath};
+flag_and_clean_path(ID, #ball{} = B) ->
+    NewPath = flag_and_clean_path(ID, B#ball.path, []),
+    B#ball{path = NewPath}.
+flag_and_clean_path(_ID, [], Acc) ->
     lists:reverse(Acc);
-flag_and_clean_client_path(ID, [{X, Y} | T], Acc) ->
-    flag_and_clean_client_path(ID, T, [{X, Y, ID} | Acc]);
-flag_and_clean_client_path(ID, [{X, Y, ID} | T], Acc) ->
-    flag_and_clean_client_path(ID, T, [{X, Y, ID} | Acc]);
-flag_and_clean_client_path(ID, [{_X, _Y, _ID2} | T], Acc) ->
-    flag_and_clean_client_path(ID, T, Acc).
+flag_and_clean_path(ID, [{X, Y} | T], Acc) ->
+    flag_and_clean_path(ID, T, [{X, Y, ID} | Acc]);
+flag_and_clean_path(ID, [{X, Y, ID} | T], Acc) ->
+    flag_and_clean_path(ID, T, [{X, Y, ID} | Acc]);
+flag_and_clean_path(ID, [{_X, _Y, _ID2} | T], Acc) ->
+    flag_and_clean_path(ID, T, Acc).
 
-run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed} = Ball) ->
-    run_step(P1, P2, Ball, [{X, Y}], Speed).
+run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed, path = Path} = Ball) ->
+    run_step(P1, P2, Ball, [{X, Y} | Path], Speed).
 
 % steps done
 run_step(_P1, _P2, Ball, Path, 0) ->
