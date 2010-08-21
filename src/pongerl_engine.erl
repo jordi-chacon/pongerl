@@ -20,7 +20,7 @@
 
 -define(SERVER, ?MODULE). 
 
--record(state, {client1 = empty, client2 = empty, 
+-record(state, {client1 = empty, client2 = empty, result = {0, 0},
 		ball = #ball{}, status = not_started}).
 
 
@@ -102,7 +102,7 @@ do_get_state(ID, State) ->
 		NC2 = flag_and_clean_path(ID, C2),
 		NB = flag_and_clean_path(ID, State#state.ball),
 		NS = State#state{client1 = NC1, client2 = NC2, ball = NB},
-		{{C1, C2, State#state.ball}, NS};
+		{{C1, C2, State#state.ball, State#state.result}, NS};
 	    not_started -> {not_started, State};
 	    restarting  -> {restarting, State#state{status = {restarting, ID}}};
 	    {restarting, ID} = St -> {restarting, State#state{status = St}};
@@ -127,11 +127,18 @@ do_change_client_position(ClientID, Direction,
 do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
     #client{x = X1, y = Y1} = C1,
     #client{x = X2, y = Y2} = C2,
-    Reply = case run_steps({X1, Y1}, {X2, Y2}, Ball) of
-		{NewBall, end_of_game} -> end_of_game;
-		NewBall                -> ok
+    {Reply, State2} = 
+	case run_steps({X1, Y1}, {X2, Y2}, Ball) of
+	    {NewBall, end_of_game, client1} -> 
+		{GoalsC1, GoalsC2} = State#state.result,
+		{end_of_game, State#state{result = {GoalsC1 + 1, GoalsC2}}};
+	    {NewBall, end_of_game, client2} -> 
+		{GoalsC1, GoalsC2} = State#state.result,
+		{end_of_game, State#state{result = {GoalsC1, GoalsC2 + 1}}};
+	    NewBall -> 
+		{ok, State}
     end,
-    {reply, Reply, State#state{ball = NewBall, status = started}}.
+    {reply, Reply, State2#state{ball = NewBall, status = started}}.
     
 
 %%%===================================================================
@@ -177,9 +184,12 @@ run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed, path = Path} = Ball) ->
 run_step(_P1, _P2, Ball, Path, 0) ->
     Ball#ball{path = Path};
 % end of game
-run_step({X1, _Y1}, {X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps) 
-  when X1 =:= XB orelse XB + ?BX - 1 =:= X2 ->
-    {Ball#ball{path = Path}, end_of_game};    
+run_step({X1, _Y1}, {_X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps) 
+  when X1 =:= XB ->
+    {Ball#ball{path = Path}, end_of_game, client2};
+run_step({_X1, _Y1}, {X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps) 
+  when XB + ?BX - 1 =:= X2 ->
+    {Ball#ball{path = Path}, end_of_game, client1};
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB =:= X1 + 1 ->
     Degrees = Ball#ball.degrees,

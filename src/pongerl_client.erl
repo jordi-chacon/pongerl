@@ -48,7 +48,7 @@ draw_game_loop(ID, ClientStr, BallStr) ->
 	restarting ->
  	    timer:sleep(?PAUSE_AFTER_GOAL div 4),
 	    draw_field();
-	{C1, C2, Ball} ->
+	{C1, C2, Ball, _Result} ->
 	    draw_game(ID, C1, C2, Ball, ClientStr, BallStr),
 	    timer:sleep(?ROUND_LENGTH)
     end,
