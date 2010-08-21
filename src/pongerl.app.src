@@ -9,6 +9,9 @@
   {modules,
    [pongerl_app
     ,pongerl_sup
+    ,pongerl_server
+    ,pongerl_engine
+    ,pongerl_client
    ]},
 
   % configuration parameters similar to those in the config file specified on the command line
