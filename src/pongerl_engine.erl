@@ -102,11 +102,16 @@ do_get_state(ID, State) ->
 		NC2 = flag_and_clean_path(ID, C2),
 		NB = flag_and_clean_path(ID, State#state.ball),
 		NS = State#state{client1 = NC1, client2 = NC2, ball = NB},
-		{{C1, C2, State#state.ball, State#state.result}, NS};
+		{{C1, C2, State#state.ball}, NS};
 	    not_started -> {not_started, State};
-	    restarting  -> {restarting, State#state{status = {restarting, ID}}};
-	    {restarting, ID} = St -> {restarting, State#state{status = St}};
-	    {restarting, _ID2} -> {restarting, State#state{status = not_started}}
+	    restarting  -> 
+		{{restarting, State#state.result}, 
+		 State#state{status = {restarting, ID}}};
+	    {restarting, ID} = St -> 
+		{{restarting, State#state.result}, State#state{status = St}};
+	    {restarting, _ID2} -> 
+		{{restarting, State#state.result}, 
+		 State#state{status = not_started}}
 	end,
     {reply, Reply, NewState}.
 
@@ -146,19 +151,20 @@ do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
 %%%===================================================================
 
 get_initial_position_client(ID, first) ->
-    X = ?X0 + 2,
-    Y = ?YF div 2 - ?CY div 2,
+    X = ?FX0 + 2,
+    Y = (?FY0 + ?FY) div 2 - ?CY div 2,
     #client{id = ID, x = X, y = Y, path = [{X, Y}]};
 get_initial_position_client(ID, second) ->
-    X = ?XF - 2 - ?CX,
-    Y = ?YF div 2 - ?CY div 2,
+    X = ?FX0 + ?FX - 1 - ?CX,
+    Y = (?FY0 + ?FY) div 2 - ?CY div 2,
     #client{id = ID, x = X, y = Y, path = [{X, Y}]}.
 
 get_initial_position_ball() -> #ball{}.
 
-get_client_new_position(#client{y = Y, x = X} = C, ?UP) when Y > ?Y0 ->
+get_client_new_position(#client{y = Y, x = X} = C, ?UP) when Y > ?FY0 ->
     C#client{y = Y - 1, path = [{X, Y} | C#client.path]};
-get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) when Y + ?CY < ?YF ->
+get_client_new_position(#client{y = Y, x = X} = C, ?DOWN) 
+  when Y + ?CY < ?FY0 + ?FY ->
     C#client{y = Y + 1, path = [{X, Y} | C#client.path]};
 get_client_new_position(C, _Direction) -> C.
 
@@ -193,7 +199,7 @@ run_step({_X1, _Y1}, {X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps)
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB =:= X1 + 1 ->
     Degrees = Ball#ball.degrees,
-    case YB >= Y1 andalso YB =< Y1 + ?CY of
+    case YB >= Y1 andalso YB =< Y1 + ?CY - 1 of
 	true when Degrees > 90 andalso Degrees < 270 ->
 	    % client 1 touches the ball
 	    NewDegrees = get_new_degree(Degrees, opposite),
@@ -214,7 +220,7 @@ run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps)
 run_step(P1, P2 = {X2, Y2}, #ball{x = XB, y = YB} = Ball, Path, Steps) 
   when XB + ?BX =:= X2 ->
     Degrees = Ball#ball.degrees,
-    case YB >= Y2 andalso YB =< Y2 + ?CY of
+    case YB >= Y2 andalso YB =< Y2 + ?CY - 1 of
 	true when Degrees < 90 orelse Degrees > 270 ->
 	    % client 2 touches the ball
 	    NewDegrees = get_new_degree(Degrees, opposite),

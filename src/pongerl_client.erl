@@ -16,8 +16,11 @@ start(Profile, OldFont) ->
     cecho:start_color(),
     cecho:init_pair(?CLIENT_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_RED),
     cecho:init_pair(?BALL_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_BLUE),
-    cecho:init_pair(?FIELD_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_BLACK),
+    cecho:init_pair(?BG_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_BLACK),
+    cecho:init_pair(?FIELD_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_YELLOW),
+    cecho:init_pair(?RESULT_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_GREEN),
     draw_field(),
+    draw_result(),
     ID = rpc(connect_client, []),
     ClientStr = generate_spaces(?CX),
     BallStr = generate_spaces(?BX),
@@ -46,10 +49,10 @@ draw_game_loop(ID, ClientStr, BallStr) ->
     case rpc(get_state, [ID]) of
 	not_started ->
 	    timer:sleep(?ROUND_LENGTH);
-	restarting ->
- 	    timer:sleep(?PAUSE_AFTER_GOAL div 4),
-	    draw_field();
-	{C1, C2, Ball, _Result} ->
+	{restarting, Result} ->
+	    draw_field(),
+	    draw_result(Result);
+	{C1, C2, Ball} ->
 	    draw_game(ID, C1, C2, Ball, ClientStr, BallStr),
 	    timer:sleep(?ROUND_LENGTH)
     end,
@@ -73,12 +76,12 @@ draw([_|T], Str, 0, Height, Pair, {_, P}, RemPrev) ->
     draw(T, Str, Height, Height, Pair, {RemPrev, [P]}, RemPrev);
 draw([{X, Y} = Pos|T], Str, HeightLeft, Height, Pair, Previous, RemPrev) ->
     NewPrevious = get_and_maybe_draw_previous(Previous, Str, Height, 
-					      ?FIELD_PAIR, Pos),
-    cecho:attron(?ceA_BOLD bor ?ceCOLOR_PAIR(Pair)),
+					      ?BG_PAIR, Pos),
+    cecho:attron(?ceCOLOR_PAIR(Pair)),
     cecho:move(Y, X),
     cecho:addstr(Str),
     cecho:refresh(),
-    cecho:attroff(?ceA_BOLD bor ?ceCOLOR_PAIR(Pair)),
+    cecho:attroff(?ceCOLOR_PAIR(Pair)),
     draw([{X, Y + 1} | T], Str, HeightLeft - 1, Height, 
 	 Pair, NewPrevious, RemPrev).
 
@@ -88,8 +91,40 @@ get_and_maybe_draw_previous({true, Previous}, Str, Height, Pair, Pos) ->
     {false, Pos}.
 
 draw_field() ->
-    Str = generate_spaces(?XF - ?X0),
-    draw([{?X0, ?Y0}], Str, ?YF, ?FIELD_PAIR, false).
+    {H, W} = cecho:getmaxyx(),
+    cecho:attron(?ceCOLOR_PAIR(?BG_PAIR)),
+    draw_background(0, H, W),
+    draw_limits(),
+    cecho:refresh().
+
+draw_limits() ->
+    cecho:attron(?ceCOLOR_PAIR(?FIELD_PAIR)),
+    cecho:move(?FY0 - 1, ?FX0 - 2),
+    cecho:hline($ , ?FX + 4),
+    cecho:move(?FY0, ?FX0 - 2),
+    cecho:vline($ , ?FY),
+    cecho:move(?FY0, ?FX0 - 1),
+    cecho:vline($ , ?FY),
+    cecho:move(?FY0, ?FX0 + ?FX),
+    cecho:vline($ , ?FY),
+    cecho:move(?FY0, ?FX0 + ?FX + 1),
+    cecho:vline($ , ?FY),
+    cecho:move(?FY0 + ?FY, ?FX0 - 2),
+    cecho:hline($ , ?FX + 4),
+    cecho:attroff(?ceCOLOR_PAIR(?FIELD_PAIR)).    
+
+draw_background(Height, Height, _Width) -> ok;
+draw_background(N, Height, Width) ->
+    cecho:move(N, 0),
+    cecho:hline($ , Width),
+    draw_background(N + 1, Height, Width).
+
+draw_result() ->
+    draw_result({0, 0}).
+
+draw_result({GC1, GC2}) ->
+    pongerl_client_utils:draw_number(GC1, ?N1X0, ?N1Y0, 1),
+    pongerl_client_utils:draw_number(GC2, ?N2X0, ?N2Y0, 2).
 
 clean_path(ID, #client{} = C) ->
     clean_path(ID, C#client.path, []) ++ [{C#client.x, C#client.y}];
