@@ -8,7 +8,12 @@ execute_server() {
 }
 
 execute_client() {
-    erl -noinput -pa ./ebin ${CECHO_EBIN} -sname $1 -setcookie pongerl -eval 'pongerl_client:start()' +A 200
+    profile=$(gconftool --get /apps/gnome-terminal/global/default_profile)
+    old_font=$(gconftool --get /apps/gnome-terminal/profiles/${profile}/font)
+    profileAtom="'"${profile}"'"
+    font="\""$old_font"\""
+    gconftool --set /apps/gnome-terminal/profiles/${profile}/font --type string "Monospace 4"
+    erl -noinput -pa ./ebin ${CECHO_EBIN} -sname $1 -setcookie pongerl -eval "pongerl_client:start($profileAtom, $font)" +A 200
 }
 
 

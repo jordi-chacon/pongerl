@@ -3,12 +3,12 @@
 
 -module(pongerl_client).
 
--export([start/0]).
+-export([start/2]).
 
 -include_lib("../include/pongerl.hrl").
 -include_lib("../dep/cecho/include/cecho.hrl").
 
-start() ->
+start(Profile, OldFont) ->
     application:start(cecho),
     cecho:cbreak(),
     cecho:noecho(),
@@ -21,24 +21,25 @@ start() ->
     ID = rpc(connect_client, []),
     ClientStr = generate_spaces(?CX),
     BallStr = generate_spaces(?BX),
-    spawn_link(fun() -> key_input_loop(ID) end),
+    spawn_link(fun() -> key_input_loop(ID, Profile, OldFont) end),
     spawn_link(fun() -> draw_game_loop(ID, ClientStr, BallStr) end).
     
-key_input_loop(ID) ->
+key_input_loop(ID, Profile, OldFont) ->
     C = cecho:getch(),
     case C of
 	$a ->
 	    ok = rpc(change_client_position, [ID, ?UP]),
-	    key_input_loop(ID);
+	    key_input_loop(ID, Profile, OldFont);
 	$z ->
 	    ok = rpc(change_client_position, [ID, ?DOWN]),
-	    key_input_loop(ID);
+	    key_input_loop(ID, Profile, OldFont);
 	$q ->
+	    restore_terminal_font(Profile, OldFont),
 	    cecho:curs_set(?ceCURS_NORMAL),
 	    application:stop(cecho),
 	    erlang:halt();
 	_ ->
-	    key_input_loop(ID)
+	    key_input_loop(ID, Profile, OldFont)
     end.
 
 draw_game_loop(ID, ClientStr, BallStr) ->
@@ -108,6 +109,12 @@ generate_spaces(N) ->
     generate_spaces(N, "").
 generate_spaces(0, Spaces) -> Spaces;
 generate_spaces(N, Spaces) -> generate_spaces(N - 1, " " ++ Spaces).
+
+restore_terminal_font(Profile, OldFont) ->
+    ProfileStr = atom_to_list(Profile),
+    Cmd = "gconftool --set /apps/gnome-terminal/profiles/" ++ ProfileStr ++ 
+	"/font --type string \"" ++ OldFont ++ "\"",
+    os:cmd(Cmd).
      
 rpc(Function, Args) ->
     rpc:call(server@ardilla, pongerl_server, Function, Args).
