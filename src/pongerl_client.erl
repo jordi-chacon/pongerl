@@ -3,12 +3,12 @@
 
 -module(pongerl_client).
 
--export([start/2]).
+-export([start/3]).
 
 -include_lib("../include/pongerl.hrl").
 -include_lib("../dep/cecho/include/cecho.hrl").
 
-start(Profile, OldFont) ->
+start(Profile, OldFont, Server) ->
     application:start(cecho),
     cecho:cbreak(),
     cecho:noecho(),
@@ -21,32 +21,32 @@ start(Profile, OldFont) ->
     cecho:init_pair(?RESULT_PAIR, ?ceCOLOR_BLACK, ?ceCOLOR_GREEN),
     draw_field(),
     draw_result(),
-    ID = rpc(connect_client, []),
+    ID = rpc(Server, connect_client, []),
     ClientStr = generate_spaces(?CX),
     BallStr = generate_spaces(?BX),
-    spawn_link(fun() -> key_input_loop(ID, Profile, OldFont) end),
-    spawn_link(fun() -> draw_game_loop(ID, ClientStr, BallStr) end).
+    spawn_link(fun() -> key_input_loop(Server, ID, Profile, OldFont) end),
+    spawn_link(fun() -> draw_game_loop(Server, ID, ClientStr, BallStr) end).
     
-key_input_loop(ID, Profile, OldFont) ->
+key_input_loop(Server, ID, Profile, OldFont) ->
     C = cecho:getch(),
     case C of
 	$a ->
-	    ok = rpc(change_client_position, [ID, ?UP]),
-	    key_input_loop(ID, Profile, OldFont);
+	    ok = rpc(Server, change_client_position, [ID, ?UP]),
+	    key_input_loop(Server, ID, Profile, OldFont);
 	$z ->
-	    ok = rpc(change_client_position, [ID, ?DOWN]),
-	    key_input_loop(ID, Profile, OldFont);
+	    ok = rpc(Server, change_client_position, [ID, ?DOWN]),
+	    key_input_loop(Server, ID, Profile, OldFont);
 	$q ->
 	    restore_terminal_font(Profile, OldFont),
 	    cecho:curs_set(?ceCURS_NORMAL),
 	    application:stop(cecho),
 	    erlang:halt();
 	_ ->
-	    key_input_loop(ID, Profile, OldFont)
+	    key_input_loop(Server, ID, Profile, OldFont)
     end.
 
-draw_game_loop(ID, ClientStr, BallStr) ->
-    case rpc(get_state, [ID]) of
+draw_game_loop(Server, ID, ClientStr, BallStr) ->
+    case rpc(Server, get_state, [ID]) of
 	not_started ->
 	    timer:sleep(?ROUND_LENGTH);
 	{restarting, Result} ->
@@ -56,7 +56,7 @@ draw_game_loop(ID, ClientStr, BallStr) ->
 	    draw_game(ID, C1, C2, Ball, ClientStr, BallStr),
 	    timer:sleep(?ROUND_LENGTH)
     end,
-    draw_game_loop(ID, ClientStr, BallStr).
+    draw_game_loop(Server, ID, ClientStr, BallStr).
 
 draw_game(ID, C1, C2, Ball, ClientStr, BallStr) ->
     Path1 = clean_path(ID, C1),
@@ -151,5 +151,5 @@ restore_terminal_font(Profile, OldFont) ->
 	"/font --type string \"" ++ OldFont ++ "\"",
     os:cmd(Cmd).
      
-rpc(Function, Args) ->
-    rpc:call(server@ardilla, pongerl_server, Function, Args).
+rpc(Server, Function, Args) ->
+    rpc:call(Server, pongerl_server, Function, Args).

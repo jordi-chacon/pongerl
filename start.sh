@@ -4,7 +4,7 @@ cd `dirname $0`
 . ./dep.inc
 
 execute_server() {
-    erl -sname server -pa ./ebin ${CECHO_EBIN} -eval "application:start(pongerl)" -setcookie pongerl
+    erl -name server -pa ./ebin ${CECHO_EBIN} -eval "application:start(pongerl)" -setcookie pongerl
 }
 
 execute_client() {
@@ -13,7 +13,8 @@ execute_client() {
     profileAtom="'"${profile}"'"
     font="\""$old_font"\""
     gconftool --set /apps/gnome-terminal/profiles/${profile}/font --type string "Monospace 8"
-    erl -noinput -pa ./ebin ${CECHO_EBIN} -sname $1 -setcookie pongerl -eval "pongerl_client:start($profileAtom, $font)" +A 200
+    # change the server host for the one you are using
+    erl -noinput -pa ./ebin ${CECHO_EBIN} -name $1 -setcookie pongerl -eval "pongerl_client:start($profileAtom, $font, server@ardilla.lan)" +A 200
 }
 
 
