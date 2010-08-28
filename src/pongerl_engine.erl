@@ -110,7 +110,8 @@ do_get_state(ID, State) ->
 	    {restarting, ID} = St -> 
 		{{restarting, State#state.result}, State#state{status = St}};
 	    {restarting, _ID2} -> 
-		{{restarting, State#state.result}, 
+		timer:sleep(?PAUSE_AFTER_GOAL),
+		{{restarting, State#state.result},
 		 State#state{status = not_started}}
 	end,
     {reply, Reply, NewState}.
@@ -188,7 +189,8 @@ run_steps(P1, P2, #ball{x = X, y = Y, speed = Speed, path = Path} = Ball) ->
 
 % steps done
 run_step(_P1, _P2, Ball, Path, 0) ->
-    Ball#ball{path = Path};
+    Speed = Ball#ball.speed,
+    Ball#ball{path = Path, speed = Speed};
 % end of game
 run_step({X1, _Y1}, {_X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps) 
   when X1 =:= XB ->
@@ -202,7 +204,7 @@ run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps)
     case YB >= Y1 andalso YB =< Y1 + ?CY - 1 of
 	true when Degrees > 90 andalso Degrees < 270 ->
 	    % client 1 touches the ball
-	    NewDegrees = get_new_degree(Degrees, opposite),
+	    NewDegrees = get_new_degree(Degrees, client_bar),
 	    NewPath = [{XB, YB} | Path],
 	    NewBall = Ball#ball{degrees = NewDegrees};
 	true ->
@@ -223,7 +225,7 @@ run_step(P1, P2 = {X2, Y2}, #ball{x = XB, y = YB} = Ball, Path, Steps)
     case YB >= Y2 andalso YB =< Y2 + ?CY - 1 of
 	true when Degrees < 90 orelse Degrees > 270 ->
 	    % client 2 touches the ball
-	    NewDegrees = get_new_degree(Degrees, opposite),
+	    NewDegrees = get_new_degree(Degrees, client_bar),
 	    NewPath = [{XB, YB} | Path],
 	    NewBall = Ball#ball{degrees = NewDegrees};
 	true ->
@@ -238,17 +240,36 @@ run_step(P1, P2 = {X2, Y2}, #ball{x = XB, y = YB} = Ball, Path, Steps)
 	    NewBall = Ball#ball{x = NX, y = NY}
     end,
     run_step(P1, P2, NewBall, NewPath, Steps - 1);
+run_step(P1, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
+  when YB =:= ?FY0 + 1 orelse YB + ?BY =:= ?FY0 + ?FY ->
+    Degrees = get_new_degree(Ball#ball.degrees, wall),
+    {NX, NY} = get_next_ball_position(XB, YB, Degrees),
+    NewPath = [{NX, NY} | Path],
+    run_step(P1, P2, Ball#ball{x = NX, y = NY, degrees = Degrees}, 
+	     NewPath, Steps - 1);
 run_step(P1, P2, #ball{x = X, y = Y} = Ball, Path, Steps) ->
     Degrees = Ball#ball.degrees,
     {NX, NY} = get_next_ball_position(X, Y, Degrees),
     NewPath = [{NX, NY} | Path],
     run_step(P1, P2, Ball#ball{x = NX, y = NY}, NewPath, Steps - 1).
     
-get_new_degree(180, opposite) -> 0;
-get_new_degree(0, opposite)   -> 180.
+get_new_degree(180, client_bar) -> 0;
+get_new_degree(0, client_bar)   -> 180;
+get_new_degree(45, client_bar)  -> 135;
+get_new_degree(135, client_bar) -> 45;
+get_new_degree(225, client_bar) -> 315;
+get_new_degree(315, client_bar) -> 225;
+get_new_degree(45, wall)        -> 315;
+get_new_degree(315, wall)       -> 45;
+get_new_degree(135, wall)       -> 225;
+get_new_degree(225, wall)       -> 135.
 
 get_next_ball_position(X, Y, 180) -> {X - 1, Y};
-get_next_ball_position(X, Y, 0)   -> {X + 1, Y}.
+get_next_ball_position(X, Y, 0)   -> {X + 1, Y};
+get_next_ball_position(X, Y, 45)  -> {X + 1, Y - 1};
+get_next_ball_position(X, Y, 135) -> {X - 1, Y - 1};
+get_next_ball_position(X, Y, 225) -> {X - 1, Y + 1};
+get_next_ball_position(X, Y, 315) -> {X + 1, Y + 1}.
     
     
 % loop to run the game engine every xx ms
@@ -256,6 +277,6 @@ run_engine_caller() ->
     timer:sleep(?ROUND_LENGTH),
     case run_engine() of
 	ok          -> run_engine_caller();
-	end_of_game -> timer:sleep(?PAUSE_AFTER_GOAL), restart_game()
+	end_of_game -> restart_game()
     end.
     

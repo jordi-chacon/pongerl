@@ -46,7 +46,7 @@
 -record(ball, {x = (?FX + ?FX0) div 2,
 	       y = (?FY + ?FY0) div 2,
 	       speed = 1,
-	       degrees = 180,
+	       degrees = 135,
 	       path = [{(?FX + ?FX0) div 2, (?FY + ?FY0) div 2}]}).
 
 -record(client, {id,
