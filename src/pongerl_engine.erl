@@ -196,7 +196,7 @@ run_step({_X1, _Y1}, {X2, _Y2}, #ball{x = XB} = Ball, Path, _Steps)
   when XB + ?BX - 1 =:= X2 ->
     {Ball#ball{path = Path}, end_of_game, client1};
 run_step(P1 = {X1, Y1}, P2, #ball{x = XB, y = YB} = Ball, Path, Steps) 
-  when XB =:= X1 + 1 ->
+  when XB =:= X1 + ?CX ->
     Degrees = Ball#ball.degrees,
     case YB >= Y1 andalso YB =< Y1 + ?CY - 1 of
 	true when Degrees > 90 andalso Degrees < 270 ->
