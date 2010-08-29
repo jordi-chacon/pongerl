@@ -104,15 +104,7 @@ do_get_state(ID, State) ->
 		NS = State#state{client1 = NC1, client2 = NC2, ball = NB},
 		{{C1, C2, State#state.ball}, NS};
 	    not_started -> {not_started, State};
-	    restarting  -> 
-		{{restarting, State#state.result}, 
-		 State#state{status = {restarting, ID}}};
-	    {restarting, ID} = St -> 
-		{{restarting, State#state.result}, State#state{status = St}};
-	    {restarting, _ID2} -> 
-		timer:sleep(?PAUSE_AFTER_GOAL),
-		{{restarting, State#state.result},
-		 State#state{status = not_started}}
+	    restarting -> {{restarting, State#state.result}, State}
 	end,
     {reply, Reply, NewState}.
 
@@ -130,7 +122,12 @@ do_change_client_position(ClientID, Direction,
 	       end,
     {reply, ok, NewState}.
 
-do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball} = State) ->
+do_run_engine(#state{client1 = C1, client2 = C2, ball = Ball, 
+		     status = Status} = State) ->
+    case Status of
+	restarting -> timer:sleep(?PAUSE_AFTER_GOAL);
+	_          -> ok
+    end,
     #client{x = X1, y = Y1} = C1,
     #client{x = X2, y = Y2} = C2,
     {Reply, State2} = 
