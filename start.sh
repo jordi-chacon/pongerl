@@ -12,7 +12,7 @@ execute_client() {
     old_font=$(gconftool --get /apps/gnome-terminal/profiles/${profile}/font)
     profileAtom="'"${profile}"'"
     font="\""$old_font"\""
-    gconftool --set /apps/gnome-terminal/profiles/${profile}/font --type string "Monospace 8"
+    gconftool --set /apps/gnome-terminal/profiles/${profile}/font --type string "Monospace 4"
     # change the server host for the one you are using
     erl -noinput -pa ./ebin ${CECHO_EBIN} -name $1 -setcookie pongerl -eval "pongerl_client:start($profileAtom, $font, server@ardilla.lan)" +A 200
 }

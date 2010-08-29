@@ -3,36 +3,36 @@
 -define(DOWN, 2).
 
 % Positions of the field
--define(FX0, 22).
--define(FY0, 4).
+-define(FX0, 60).
+-define(FY0, 10).
 
 % Dimensions of the field
--define(FX, 40).
--define(FY, 20).
+-define(FX, 240).
+-define(FY, 90).
 
 % Dimensions of the bars of the clients
--define(CY, 3).
--define(CX, 1).
+-define(CY, 14).
+-define(CX, 2).
 
 % Dimensions of the ball
--define(BX, 2).
--define(BY, 1).
+-define(BX, 8).
+-define(BY, 4).
 
 % Dimensions of the numbers of the score
 -define(NX, 6).
 -define(NY, 5).
+-define(NFACTOR, 3).
 
 % Positions first number of result
--define(N1X0, 9).
--define(N1Y0, 11).
+-define(N1X0, 30).
+-define(N1Y0, 45).
 
 % Positions second number of result
--define(N2X0, ?FX0 + ?FX + 7).
--define(N2Y0, 11).
+-define(N2X0, ?FX0 + ?FX + 10).
+-define(N2Y0, 45).
 
 % Round length
 -define(ROUND_LENGTH, 100).
-
 % Pause after goal
 -define(PAUSE_AFTER_GOAL, 3000).
 
@@ -45,7 +45,7 @@
 
 -record(ball, {x = (?FX + ?FX0) div 2,
 	       y = (?FY + ?FY0) div 2,
-	       speed = 1,
+	       speed = 2,
 	       degrees = 135,
 	       path = [{(?FX + ?FX0) div 2, (?FY + ?FY0) div 2}]}).
 
